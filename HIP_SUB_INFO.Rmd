@@ -1,0 +1,297 @@
+---
+title: "HIP&SUB_subregions"
+author: "Yu-Kuan, Pan"
+date: "3/18/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("/fly brain project/programs/clustersFunction.R")
+```
+
+# requirement
+  load in ss.seurat data, raw data and HIP.5sub.s4obj from HIP 5 sub info.rda
+# single cell RNA seq
+  Single Cell Rna seq technique: merge data from Hippocampus and SUB-PROS and 
+    create Seurat object from the merged data sets for further usage 
+    in application.
+  
+  data: data sets are based on ss.seurat, original raw data is 
+        provided from NCBI GSE185862 which collected by 
+        Allen Institute for Brain Science at Oct 20, 2021.
+        the hip 5 sub info.rda contain hip.5sub.s4obj
+  
+
+# method
+  1.    Seurat object:    Separate SUB-Pros with 5 sub regions and create 
+                          new seurat object with separated SUB-Pros metadata
+  2.    Umap:             Easily visualized by user 
+  3.    Recluster:        Recluster seurat object and rename idents afterward
+  4.    Featureplot:      Clarify each clusters by known marker gene feature plot     
+  
+# Summary
+  The purpose of project is to create merged Hippocampus and SUB-PROS seurat 
+  objects with two different reference. The first Seurat object was seperated 
+  by subregions. The second Seurat object was seperated by new resolution 
+  and renamed clusters afterward 
+
+## load in required data
+```{r}
+load("./HIP 5sub info.rda")
+```
+
+
+```{r}
+load("../Seurat.ss.rda")
+```
+
+## dimplot 
+  Dimplot for hippocampus seurat object
+```{r}
+DimPlot(HIP.5sub.s4obj,reduction = "umap")
+```
+## SUB-ProS metadata
+create SUB-ProS metadata from ss.seurat, region_label column 
+
+```{r}
+SUBpros<-filter(ss.seurat@meta.data,region_label=="SUB-ProS")
+SUBpros<-filter(SUBpros,
+                subclass_label=="DG" |
+                subclass_label=="CA1-ProS" | 
+                subclass_label=="SUB-ProS" |
+                subclass_label=="CA3" |
+                subclass_label=="CA2-IG-FC")
+```
+
+## SUB-Pros seurat object 
+create SUB-PROS Seurat object 
+```{r}
+SUBpros.s4obj<-ss.seurat[,SUBpros$sample_name]
+```
+
+
+
+## merge HIP SUB-Pros
+  combine suniculumn and hippocampus data 
+```{r}
+HipSub.s4obj<-merge(SUBpros.s4obj,HIP.5sub.s4obj)
+```
+
+```{r}
+Idents(HipSub.s4obj)<-HipSub.s4obj@meta.data$subclass_label
+
+
+HipSub.s4obj<-NormalizeData(HipSub.s4obj)
+HipSub.s4obj<-FindVariableFeatures(HipSub.s4obj)
+all.genes<-rownames(HipSub.s4obj)
+HipSub.s4obj<-ScaleData(HipSub.s4obj)
+HipSub.s4obj<-RunPCA(
+  HipSub.s4obj,features = VariableFeatures(object = HipSub.s4obj))
+HipSub.s4obj<-RunTSNE(HipSub.s4obj,dims =1:16)
+HipSub.s4obj<-RunUMAP(HipSub.s4obj,dims=1:16)
+```
+## Dimplot
+  dimplot for merged, Hippocampus and SUB-PROS, data 
+```{r}
+DimPlot(HipSub.s4obj,reduction = "umap")
+```
+
+## Differential expression 
+  Differential expression for subregion based merged seurat object 
+```{r}
+FindAllMarkers(HipSub.s4obj)
+```
+
+## Hip Sub clusters
+  pre-processing with data set that contain hippocampus and subiculumn 
+```{r}
+HipSub.s4obj.cluster<-NormalizeData(HipSub.s4obj)
+HipSub.s4obj.cluster<-FindVariableFeatures(HipSub.s4obj.cluster)
+all.genes<-rownames(HipSub.s4obj.cluster)
+HipSub.s4obj.cluster<-ScaleData(HipSub.s4obj.cluster)
+HipSub.s4obj.cluster<-RunPCA(
+  HipSub.s4obj.cluster,features = VariableFeatures(object = HipSub.s4obj.cluster))
+
+HipSub.s4obj.cluster<-FindNeighbors(HipSub.s4obj.cluster,graph.name = "cluster")
+HipSub.s4obj.cluster<-FindClusters(HipSub.s4obj.cluster,
+                                   resolution = 0.5
+                                   ,graph.name = "cluster",
+                                   verbose = T)
+HipSub.s4obj.cluster<-RunTSNE(HipSub.s4obj.cluster,dims =1:16)
+HipSub.s4obj.cluster<-RunUMAP(HipSub.s4obj.cluster,dims=1:16)
+
+```
+
+## Rename Idents
+identify all the clusters within the seurat object 
+all the clusters will be classify by the following section 
+```{r}
+HipSub.s4obj.cluster<-RenameIdents(object = HipSub.s4obj.cluster,
+                                   "1" = "CA1v", "3" = "CA1d",
+                                   "8" = "CA3d", "9" = "CA3v",
+                                   "5" = "SUBd", "6" = "SUBv")
+```
+
+```{r}
+HipSub.s4obj.cluster<-RenameIdents(object = HipSub.s4obj.cluster,
+                                   "7" ="0",
+                                   "2" ="4",
+                                   "10"="4")
+```
+
+
+
+```{r, results='hide'}
+#HipSub.s4obj.cluster<-RenameIdents(object = HipSub.s4obj.cluster,
+#                                   "0" = "DG","2" ="DG", "4" ="DG",
+#                                   "7" = "DG", "10" ="DG")
+```
+
+```{r, results='hide'}
+#HipSub.s4obj.cluster<-RenameIdents(object = HipSub.s4obj.cluster,
+#                                   "0"="DGd","7"="DGd","2"="DGv","4"="DGv","10"="DGv")
+```
+
+```{r}
+HipSub.s4obj.cluster<-RenameIdents(object = HipSub.s4obj.cluster,
+                                   "0"="DGd","4"="DGv")
+```
+
+
+## Dimplot
+  Dimplot for reclustered, hippocampus and SUB-PROS, data
+```{r}
+DimPlot(HipSub.s4obj.cluster,reduction = "umap",label = T)
+```
+
+## Differential Expression
+  Differential expression for reclustered based merged seurat object
+```{r}
+HipSub.DE<- FindAllMarkers(HipSub.s4obj.cluster)
+```
+
+```{r}
+HipSub.DE
+```
+
+## heatmap
+```{r}
+HipSub.DE %>% 
+  group_by(cluster) %>% 
+  top_n(n = 20, wt = avg_log2FC) -> HIPSub.top20
+```
+
+```{r}
+DoHeatmap(object = HipSub.s4obj.cluster, features = HIPSub.top20$gene)+
+  theme(axis.text.y.left = element_text(size = 6, face = "bold"))
+```
+```{r}
+DimPlot(HipSub.s4obj.cluster, group.by = "subclass_label",
+        cols = c("CA1-ProS"= "#F8766D", "CA2-IG-FC"= "#FF61CC",
+                 "CA3"= "#7CAE00", "DG"= "#00A9FF", "SUB-ProS"= "#CD9600"))
+```
+
+
+```{r, results='hide'}
+FeaturePlot(HipSub.s4obj.cluster,features = "Wfs1",label = T)
+FeaturePlot(HipSub.s4obj.cluster,features = "Dcn",label = T)
+```
+
+## CA1 dorsal
+```{r}
+#CA1d
+FeaturePlot(HipSub.s4obj.cluster,features = 'Penk',label = T)
+FeaturePlot(HipSub.s4obj.cluster,features = 'Egr1',label = T) # most iconic 
+FeaturePlot(HipSub.s4obj.cluster,features = 'Wfs1',label = T)
+FeaturePlot(HipSub.s4obj.cluster,features = 'Igfbp4',label = T)
+FeaturePlot(HipSub.s4obj.cluster,features = 'Spink8',label = T)
+```
+
+## CA1 ventral
+```{r}
+#CA1v
+FeaturePlot(HipSub.s4obj.cluster,features = 'Dcn',label = T) # most iconic 
+FeaturePlot(HipSub.s4obj.cluster,features = 'Nov',label = T)
+FeaturePlot(HipSub.s4obj.cluster,features = 'Cpne7',label = T)
+FeaturePlot(HipSub.s4obj.cluster,features = 'Timp2',label = T)
+FeaturePlot(HipSub.s4obj.cluster,features = 'Nnat',label = T)
+```
+
+## CA3 dorsal
+```{r}
+#CA3d
+FeaturePlot(HipSub.s4obj.cluster,features = 'Prkcd')
+FeaturePlot(HipSub.s4obj.cluster,features = 'Cpne9') # most iconic 
+FeaturePlot(HipSub.s4obj.cluster,features = 'Trps1')
+FeaturePlot(HipSub.s4obj.cluster,features = 'Slc15a1')
+FeaturePlot(HipSub.s4obj.cluster,features = 'Bok')
+```
+
+## CA3 ventral
+```{r}
+#CA3v
+FeaturePlot(HipSub.s4obj.cluster,features = 'Calb2')
+FeaturePlot(HipSub.s4obj.cluster,features = 'Sgcd')
+FeaturePlot(HipSub.s4obj.cluster,features = 'Plcxd3')
+FeaturePlot(HipSub.s4obj.cluster,features = 'Prss23')
+FeaturePlot(HipSub.s4obj.cluster,features = 'Col6a1') # most iconic
+```
+
+
+## Sub dorsal 
+```{r}
+FeaturePlot(HipSub.s4obj.cluster, features = "Nts")
+```
+
+## sub ventral 
+```{r}
+FeaturePlot(HipSub.s4obj.cluster, features = "Dpp10")
+```
+
+## DG dorsal 
+```{r}
+FeaturePlot(HipSub.s4obj.cluster, features = "Capn3")
+```
+
+## DG ventral 
+dorsal ventral part didn't segregate other cluster that well
+```{r}
+FeaturePlot(HipSub.s4obj.cluster, features = "Adarb2")
+```
+
+
+## citation
+the following citation are all the library I had used within thist program
+```{r}
+citation("Seurat")
+```
+
+```{r}
+citation("tidyverse")
+```
+
+```{r}
+citation("ggplot2")
+```
+
+```{r}
+citation("limma")
+```
+
+```{r}
+citation("data.table")
+```
+
+```{r}
+citation("Matrix")
+```
+
+```{r}
+citation("pheatmap")
+```
+
+```{r}
+citation("ape")
+```
+

@@ -1,0 +1,786 @@
+---
+title: "AdultRegionInfo"
+author: "Yu-Kuan, Pan"
+date: "2023-03-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(Seurat)
+library(ape)
+library(Matrix)
+#library(tidyverse)
+library(dplyr)
+library(openxlsx)
+```
+
+```{r}
+load("./hipSubS4objCluster.rda")
+load("./regionData.rda")
+```
+
+```{r}
+Idents(region.data)<- region.data@meta.data$region_label
+region.data<-BuildClusterTree(region.data,
+                               features=rownames(region.data))
+PlotClusterTree(region.data)
+
+```
+
+```{r}
+region.data@meta.data<-mutate(region.data@meta.data,
+                              region="NEO")
+```
+
+```{r}
+for(i in 1:nrow(region.data@meta.data)){
+  if(region.data@meta.data$region_label[i]=="HIP"){
+    region.data@meta.data$region[i]="HIP"
+  }
+  else if(region.data@meta.data$region_label[i]=="SUB-ProS"){
+    region.data@meta.data$region[i]="SUB-ProS"
+  }
+  else if(region.data@meta.data$region_label[i]=="ENTm"){
+    region.data@meta.data$region[i]="ENT"
+  }
+  else if(region.data@meta.data$region_label[i]=="ENTl"){
+    region.data@meta.data$region[i]="ENT"
+  }
+}
+```
+
+```{r}
+Idents(region.data)<-region.data@meta.data$region
+```
+
+```{r}
+region.genelist<-FindAllMarkers(region.data)
+```
+
+```{r}
+#region.genelist %>%
+#  group_by(cluster) %>%
+#  top_n(n=10,wt=avg_log2FC) -> top10
+#DoHeatmap(region.data,features = top10$gene)
+```
+
+```{r}
+#top10
+```
+## Hippocampus test 
+```{r}
+#for(i in 11:20){
+#  print(VlnPlot(region.data, features = top10$gene[i], group.by = "region"))
+#}
+```
+
+```{r}
+FindMarkers(region.data, ident.1 = "HIP",
+            min.diff.pct = 0.2, logfc.threshold = 0.5,
+            only.pos = T) -> HIPDiff02FC07
+```
+
+```{r}
+HIPDiff02FC07 %>%
+  mutate(gene = rownames(HIPDiff02FC07)) -> HIPDiff02FC07
+HIPDiff02FC07 
+```
+
+
+```{r}
+for(i in 1:nrow(HIPDiff02FC07)){
+  print(VlnPlot(region.data,
+                features = rownames(HIPDiff02FC07)[i],
+                group.by = "region"))
+}
+```
+
+```{r}
+HIPseq<- c(1, 4, 5, 10, 13)
+#DimPlot(region.data, reduction = "umap")
+FeaturePlot(region.data, features = "Zbtb20")
+#for(i in 1:length(HIPseq)){
+#  print(FeaturePlot(region.data, features = #HIPDiff02FC07$gene[HIPseq[i]]))
+#}
+```
+
+
+## ENT test 
+```{r}
+FindMarkers(region.data, ident.1 = "ENT",
+            min.diff.pct = 0.2, logfc.threshold = 0.5,
+            only.pos = T) -> ENTDiff02FC05
+```
+
+```{r}
+ENTDiff02FC05 %>% 
+  mutate(gene = rownames(ENTDiff02FC05)) -> ENTDiff02FC05
+ENTDiff02FC05
+```
+
+
+```{r}
+for( i in 1:nrow(ENTDiff02FC05)){
+  print(VlnPlot(region.data,
+                features = rownames(ENTDiff02FC05)[i],
+                group.by = "region"))
+}
+```
+
+```{r}
+#DimPlot(region.data, reduction = "umap", group.by = "region_label")
+#ENTseq<- c(3, 4)
+#for(i in 1:length(ENTseq)){
+#  print(FeaturePlot(region.data, features = ENTDiff02FC05$gene[ENTseq[i]]))
+#}
+FeaturePlot(region.data, features = "Rxfp1")
+```
+
+## NEO test
+```{r}
+FindMarkers(region.data, ident.1 = "NEO",
+            min.diff.pct = 0.2, logfc.threshold = 0.5,
+            only.pos = T) -> NEODiff02FC07
+```
+
+```{r}
+NEODiff02FC07 %>%
+  mutate(gene = rownames(NEODiff02FC07)) -> NEODiff02FC07
+NEODiff02FC07
+```
+
+
+```{r}
+for( i in 1:nrow(NEODiff02FC07)){
+  print(VlnPlot(region.data,
+                features = rownames(NEODiff02FC07)[i],
+                group.by = "region"))
+}
+```
+
+```{r}
+#DimPlot(region.data)
+#NEOseq<- c(1, 3, 4, 5, 7, 9)
+#DimPlot(region.data, reduction = "umap")
+#for(i in 1:length(NEOseq)){
+#  print(FeaturePlot(region.data, features = #NEODiff02FC07$gene[NEOseq[i]]))
+#}
+FeaturePlot(region.data, features = "S100a10")
+```
+
+## filter hippocampus information 
+filter hippocampus information make sure sub-Prox is not included
+```{r}
+HipSub.s4obj.cluster@meta.data$seurat_clusters<- 
+  HipSub.s4obj.cluster@active.ident
+```
+
+## generate area information 
+generate information that classify dorsal and ventral 
+based on clustered sub-regions within hippocmpus 
+we combine dorsal DG, CA1 and CA3 and defined as dorsal hippocampus 
+and the same process with the ventral part 
+```{r}
+HIPList<- WhichCells(HipSub.s4obj.cluster,
+                     idents = c("DGd", "DGv", "CA1d", "CA1v", "CA3d", "CA3v"))
+Hip.s4obj.cluster<- HipSub.s4obj.cluster[, HIPList]
+```
+
+```{r}
+Hip.s4obj.cluster@meta.data %>% 
+  mutate(area = ifelse(seurat_clusters == "DGd" | seurat_clusters == "CA1d" | seurat_clusters == "CA3d", "Dorsal", 
+                       ifelse(seurat_clusters == "DGv" | seurat_clusters == "CA1v" | seurat_clusters == "CA3v", "Ventral", NA))) -> Hip.s4obj.cluster@meta.data
+```
+
+##HIP dorsal 
+```{r}
+FindMarkers(Hip.s4obj.cluster,
+            ident.1 = "Dorsal",
+            ident.2 = "Ventral",
+            #logfc.threshold =  0.6, 
+            #min.diff.pct = 0.13,
+            logfc.threshold = 0.5,
+            min.diff.pct = 0.2,
+            group.by = "area",
+            only.pos = T)-> HIPDDiff02Fc07
+```
+
+```{r}
+HIPDDiff02Fc07 %>%
+  mutate(gene = rownames(HIPDDiff02Fc07)) -> HIPDDiff02Fc07
+HIPDDiff02Fc07
+```
+
+```{r}
+for(i in 1:nrow(HIPDDiff02Fc07)){
+  print(VlnPlot(Hip.s4obj.cluster,
+                rownames(HIPDDiff02Fc07)[i],
+                group.by = "area"))
+}
+```
+
+```{r}
+for(i in 1:nrow(HIPDDiff02Fc07)){
+  print(VlnPlot(Hip.s4obj.cluster,
+                rownames(HIPDDiff02Fc07)[i],
+                group.by = "seurat_clusters"))
+}
+```
+
+
+```{r}
+DimPlot(region.data, reduction = "umap")
+DimPlot(Hip.s4obj.cluster, reduction = "umap")
+for(i in 1:nrow(HIPDDiff02Fc07)){
+  print(FeaturePlot(region.data, features = HIPDDiff02Fc07$gene[i]))
+  print(FeaturePlot(Hip.s4obj.cluster, features = HIPDDiff02Fc07$gene[i]))
+}
+```
+
+```{r}
+DimPlot(region.data, reduction = "umap", cols = c("#00BFC4",
+                                                  "#7CAE00",
+                                                  "#F8766D",
+                                                  "#C77CFF"))
+DimPlot(Hip.s4obj.cluster, reduction = "umap")
+FeaturePlot(region.data, features = "Tdo2")
+FeaturePlot(Hip.s4obj.cluster, features = "Tdo2")
+```
+
+
+## HIP ventral 
+```{r}
+FindMarkers(Hip.s4obj.cluster,
+            ident.1 = "Ventral",
+            ident.2 = "Dorsal",
+            #logfc.threshold = 0.6,
+            #min.diff.pct = 0.13,
+            logfc.threshold = 0.5,
+            min.diff.pct = 0.2,
+            group.by = "area", 
+            only.pos = T) -> HIPVDiff02Fc07
+```
+
+```{r}
+HIPVDiff02Fc07 %>% 
+  mutate(gene = rownames(HIPVDiff02Fc07)) -> HIPVDiff02Fc07
+HIPVDiff02Fc07
+```
+
+```{r}
+for(i in 1:nrow(HIPVDiff02Fc07)){
+  print(VlnPlot(Hip.s4obj.cluster,
+                features = rownames(HIPVDiff02Fc07)[i], 
+                group.by = "area"))
+}
+```
+
+```{r}
+#DimPlot(region.data, reduction = "umap")
+#DimPlot(Hip.s4obj.cluster, reduction = "umap")
+FeaturePlot(region.data, features = "Dcn")
+FeaturePlot(Hip.s4obj.cluster, features = "Dcn")
+```
+
+## HIP sub-region area test 
+test out the 3 sub region within hippocampus (CA1, CA3, DG)
+and compare each dorsal or ventral part with others to find 
+each marker genes 
+
+```{r}
+FindAllMarkers(Hip.s4obj.cluster,
+               logfc.threshold = 0.5,
+               #min.diff.pct = 0.3,
+               min.diff.pct = 0.2,
+               only.pos = T) -> HIPsubDV
+HIPsubDV
+```
+
+```{r}
+HIPsubDV %>% 
+  group_by(cluster) %>% 
+  top_n(n = 10, wt = avg_log2FC) -> HIPsubDVTop10
+HIPsubDVTop10
+```
+
+## DGd 
+```{r}
+for(i in 1:10){
+  print(VlnPlot(Hip.s4obj.cluster, HIPsubDVTop10$gene[i]))
+}
+```
+
+```{r}
+#none update
+DGdseq<- c(4)
+DimPlot(Hip.s4obj.cluster, reduction = "umap")
+#for(i in 1:length(DGdseq)){
+#  print(FeaturePlot(Hip.s4obj.cluster, HIPsubDVTop10$gene[DGdseq[i]]))
+#}
+FeaturePlot(Hip.s4obj.cluster, features = "Tdo2")
+```
+
+```{r}
+DGd<- FindMarkers(Hip.s4obj.cluster, ident.1 = "DGd", 
+                  ident.2 = "DGv", logfc.threshold = 0.5, 
+                  min.diff.pct = 0.2, only.pos = T)
+DGd
+```
+
+```{r}
+for(i in 1:nrow(DGd)){
+  print(VlnPlot(Hip.s4obj.cluster, features = rownames(DGd)[i]))
+}
+```
+
+
+## DGv
+```{r}
+for(i in 11:20){
+  print(VlnPlot(Hip.s4obj.cluster, HIPsubDVTop10$gene[i]))
+}
+```
+
+```{r}
+#none update
+DGvSeq<- c(16)
+for(i in 1:length(DGvSeq)){
+  print(FeaturePlot(Hip.s4obj.cluster, features = HIPsubDVTop10$gene[DGvSeq[i]]))
+}
+```
+
+```{r}
+DGv<- FindMarkers(Hip.s4obj.cluster, ident.1 = "DGv", 
+                  ident.2 = "DGd", logfc.threshold = 0.5, 
+                  min.diff.pct = 0.2, only.pos = T)
+DGv
+```
+
+```{r}
+for(i in 1:nrow(DGv)){
+  print(VlnPlot(Hip.s4obj.cluster, features = rownames(DGv)[i]))
+}
+```
+
+## CA1v
+```{r}
+for(i in 21:30){
+  print(VlnPlot(Hip.s4obj.cluster, HIPsubDVTop10$gene[i]))
+}
+```
+
+```{r}
+
+#seqCA1v <- c(21, 22, 23, 24, 25, 26, 28)
+#DimPlot(Hip.s4obj.cluster, reduction = "umap")
+#for(i in 1:length(seqCA1v)){
+#  print(FeaturePlot(Hip.s4obj.cluster,
+#                    features = HIPsubDVTop10$gene[seqCA1v[i]]))
+#}
+FeaturePlot(Hip.s4obj.cluster, features = "Fibcd1")
+```
+
+
+## CA1d
+```{r}
+for(i in 31:40){
+  print(VlnPlot(Hip.s4obj.cluster, HIPsubDVTop10$gene[i]))
+}
+```
+
+```{r}
+#none update 
+CA1dSeq<- c(31, 32, 33, 35, 36, 37, 39)
+DimPlot(Hip.s4obj.cluster, reduction = "umap")
+for(i in 1:length(CA1dSeq)){
+  print(FeaturePlot(Hip.s4obj.cluster, features = HIPsubDVTop10$gene[CA1dSeq[i]]))
+}
+```
+
+```{r}
+FeaturePlot(Hip.s4obj.cluster, features = "Neurod6")
+```
+
+
+## CA3d
+```{r}
+for(i in 41:50){
+  print(VlnPlot(Hip.s4obj.cluster, HIPsubDVTop10$gene[i]))
+}
+```
+
+```{r}
+#none update
+CA3dSeq<- c(41, 42, 44)
+DimPlot(Hip.s4obj.cluster, reduction = "umap")
+for(i in 1:length(CA3dSeq)){
+  print(FeaturePlot(Hip.s4obj.cluster, features = HIPsubDVTop10$gene[CA3dSeq[i]]))
+}
+
+```
+
+```{r}
+FeaturePlot(Hip.s4obj.cluster, features = "Nrip3")
+```
+
+
+## CA3v 
+```{r}
+for(i in 51:60){
+  print(VlnPlot(Hip.s4obj.cluster, HIPsubDVTop10$gene[i]))
+}
+```
+
+```{r}
+#none update
+
+CA3VSeq<- c(52, 54, 56, 57, 60)
+DimPlot(Hip.s4obj.cluster, reduction = "umap")
+for(i in 1:length(CA3VSeq)){
+  print(FeaturePlot(Hip.s4obj.cluster, features = HIPsubDVTop10$gene[CA3VSeq[i]]))
+}
+```
+
+
+## ENT 
+```{r}
+ENT.s4obj<- region.data[, WhichCells(region.data, idents = "ENT")]
+```
+
+```{r}
+DimPlot(ENT.s4obj, group.by = "region_label")
+```
+
+```{r}
+ENTMec<- FindMarkers(ENT.s4obj,
+                     ident.1 = "ENTm",
+                     ident.2 = "ENTl",
+                     min.diff.pct = 0.2,
+                     logfc.threshold = 0.5,
+                     #logfc.threshold = 0.5,
+                     group.by = "region_label", 
+                     only.pos = T)
+```
+
+```{r}
+ENTMec %>%
+  mutate(gene = rownames(ENTMec))
+ENTMec
+```
+
+
+```{r}
+for(i in 1:nrow(ENTMec)){
+  print(VlnPlot(ENT.s4obj, features = rownames(ENTMec)[i],
+                group.by = "region_label"))
+}
+```
+
+```{r}
+ENTmseq<- c(1, 2)
+DimPlot(ENT.s4obj, reduction = "umap", group.by = "region_label")
+for(i in 1:length(ENTmseq)){
+  print(FeaturePlot(ENT.s4obj, features = rownames(ENTMec)[ENTmseq[i]]))
+}
+```
+
+
+```{r}
+ENTLec<- FindMarkers(ENT.s4obj,
+                     ident.1 = "ENTl", 
+                     ident.2 = "ENTm",
+                     min.diff.pct = 0.2, 
+                     logfc.threshold = 0.5,
+                     #logfc.threshold = 0.4,
+                     group.by = "region_label", 
+                     only.pos = T)
+```
+
+```{r}
+ENTLec %>%
+  mutate(gene = rownames(ENTLec)) -> ENTLec
+ENTLec
+```
+
+
+```{r}
+for(i in 1: nrow(ENTLec)){
+  print(VlnPlot(ENT.s4obj, features = rownames(ENTLec)[i], 
+                group.by = "region_label"))
+}
+```
+
+```{r}
+DimPlot(ENT.s4obj, reduction = "umap", group.by = "region_label")
+for(i in 1: nrow(ENTLec)){
+  print(FeaturePlot(ENT.s4obj, features = rownames(ENTLec)[i]))
+}
+```
+
+## cluster ENT information 
+```{r}
+ENT.s4obj<- region.data[, WhichCells(region.data, idents = "ENT")]
+ENT.s4obj<- FindNeighbors(ENT.s4obj, dims = 1:10)
+ENT.s4obj<- FindClusters(ENT.s4obj, resolution = 1.5)
+ENT.s4obj<- RunUMAP(ENT.s4obj, dims = 1:10)
+ENT.s4obj<- RunTSNE(ENT.s4obj, dims = 1:10)
+```
+
+```{r}
+DimPlot(ENT.s4obj, reduction = "umap", group.by = "region_label")
+```
+
+## find marker genes at each cluster 
+```{r}
+FindAllMarkers(ENT.s4obj, logfc.threshold = 0.5,
+               min.diff.pct = 0.2, only.pos = T)-> ENT.markers
+ENT.markers
+```
+
+```{r}
+ENT.markers %>%
+  group_by(cluster) %>% 
+  top_n(n= 10, wt = avg_log2FC) -> ENT.markers.top10
+ENT.markers.top10
+```
+
+
+##MEC information
+```{r}
+ENTmseq<- c(1, 2)
+DimPlot(ENT.s4obj, reduction = "umap", group.by = "region_label")
+for(i in 1:length(ENTmseq)){
+  print(FeaturePlot(ENT.s4obj, features = rownames(ENTMec)[ENTmseq[i]]))
+}
+```
+
+##LEC information
+```{r}
+DimPlot(ENT.s4obj, reduction = "umap", group.by = "region_label")
+for(i in 1: nrow(ENTLec)){
+  print(FeaturePlot(ENT.s4obj, features = rownames(ENTLec)[i]))
+}
+```
+
+##check layer2 Reelin and cabindin at Entorhinal 
+```{r}
+FeaturePlot(ENT.s4obj, features = "Wfs1", label = T) #layer2
+FeaturePlot(ENT.s4obj, features = "Tbr1", label = T) # deep
+FeaturePlot(ENT.s4obj, features = "Reln", label = T) #layer2 Reln
+FeaturePlot(ENT.s4obj, features = "Calb1", label = T) # layer2 calbin1
+```
+
+# find unique cell from L2 Reln and Calb1
+```{r}
+length(setdiff(WhichCells(ENT.s4obj, expression = Reln>0),
+               WhichCells(ENT.s4obj, expression = Calb1 >0)))
+```
+
+## differential expression 
+```{r}
+#Reln top
+FindMarkers(ENT.s4obj, ident.1 = "3",
+            min.diff.pct = 0.2, logfc.threshold = 0.5, 
+            only.pos = T)
+```
+
+## L2 Reln
+```{r}
+VlnPlot(ENT.s4obj, features = "Reln")
+FeaturePlot(ENT.s4obj, features = "Reln", label = T)
+```
+
+```{r}
+# Reln 2nd
+FindMarkers(ENT.s4obj, ident.1 = "10", 
+            min.diff.pct = 0.2, logfc.threshold = 0.5, 
+            only.pos = T)
+```
+
+```{r}
+#Reln 3rd
+FindMarkers(ENT.s4obj, ident.1 = "11", 
+            min.diff.pct = 0.2, logfc.threshold = 0.5, 
+            only.pos = T)
+```
+
+```{r}
+#Reln 4th
+FindMarkers(ENT.s4obj, ident.1 = "9", 
+            min.diff.pct = 0.2, logfc.threshold = 0.5, 
+            only.pos = T)
+```
+
+```{r}
+#Cabindin
+FindMarkers(ENT.s4obj, ident.1 = "4", 
+            min.diff.pct = 0.2, logfc.threshold = 0.5, 
+            only.pos = T)
+```
+
+## L2 Calbindin 
+```{r}
+VlnPlot(ENT.s4obj, features = "Calb1")
+FeaturePlot(ENT.s4obj, features = "Calb1", label = T)
+```
+
+```{r}
+FindMarkers(ENT.s4obj, ident.1 = "7", 
+            min.diff.pct = 0.2, logfc.threshold = 0.5, 
+            only.pos = T)
+```
+
+
+## excel workbook 
+```{r}
+workbook<- createWorkbook()
+addWorksheet(workbook, sheetName = "HIP") # whole hippocampus
+addWorksheet(workbook, sheetName = "ENT") # whole Entorhinal 
+addWorksheet(workbook, sheetName = "NEO") # whole Neo cortex
+
+addWorksheet(workbook, sheetName = "HIPd") # hippocampus dorsal 
+addWorksheet(workbook, sheetName = "HIPv") # hippocampus ventral
+
+addWorksheet(workbook, sheetName = "DGd") # DGd
+addWorksheet(workbook, sheetName = "DGv") # DGv
+addWorksheet(workbook, sheetName = "CA1v") # CA1v
+addWorksheet(workbook, sheetName = "CA1d") # CA1d
+addWorksheet(workbook, sheetName = "CA3d") # CA3d
+addWorksheet(workbook, sheetName = "CA3v") # CA3v
+
+addWorksheet(workbook, sheetName = "ENTm") # ENTm
+addWorksheet(workbook, sheetName = "ENTl") # ENTl
+```
+
+```{r}
+adultInfo<- function(diffResult){
+  diffResult %>% 
+    mutate(gene = rownames(diffResult))
+}
+```
+
+```{r}
+FindMarkers(ENT.s4obj, ident.1 = "L2 IT ENTm", 
+            logfc.threshold = 0.5, min.diff.pct = 0.2,
+            only.pos = T, group.by = "subclass_label")
+```
+
+```{r}
+FindMarkers(ENT.s4obj, ident.1 = "L2 IT ENTl", 
+            logfc.threshold = 0.5, min.diff.pct = 0.2, 
+            only.pos = T, group.by = "subclass_label")
+```
+
+## select only InterNeuron 
+```{r}
+ENT.s4obj@meta.data %>%
+  filter(grepl('ENT', subclass_label))-> ENT.ent.meta
+ENT.s4obj@meta.data %>% 
+  filter(grepl('CTX', subclass_label))-> ENT.ctx.meta
+ENT.IT.meta<- rbind(ENT.ent.meta, ENT.ctx.meta)
+```
+
+```{r}
+ENT.IT.s4obj<- ENT.s4obj[,rownames(ENT.IT.meta)]
+```
+
+```{r}
+Idents(ENT.IT.s4obj)<- ENT.IT.s4obj@meta.data$subclass_label
+DimPlot(ENT.IT.s4obj)
+```
+
+```{r}
+Idents(ENT.IT.s4obj)<- ENT.IT.s4obj@meta.data$subclass_label
+FeaturePlot(ENT.IT.s4obj, features = "Reln", label = T)+
+  VlnPlot(ENT.IT.s4obj, features = "Reln",
+          group.by = "subclass_label")
+Idents(ENT.IT.s4obj)<- ENT.IT.s4obj@meta.data$region_label
+```
+
+```{r}
+FeaturePlot(ENT.IT.s4obj, features = "Calb1", label = T)+
+  VlnPlot(ENT.IT.s4obj, features = "Calb1")
+```
+
+```{r}
+ENT.classes<- levels(ENT.IT.s4obj)
+for(i in 1:length(levels(ENT.IT.s4obj))){
+  print(DimPlot(ENT.IT.s4obj, 
+                cells.highlight = 
+                  WhichCells(ENT.IT.s4obj,
+                             idents = ENT.classes[i]))+
+          ggtitle(ENT.classes[i]))
+}
+```
+
+```{r}
+Idents(ENT.IT.s4obj)<- ENT.IT.s4obj@meta.data$region_label
+DimPlot(ENT.IT.s4obj)
+ENTm.IT.marker<- FindMarkers(ENT.IT.s4obj, ident.1 = "ENTm",
+                             ident.2 = "ENTl", min.diff.pct = 0.2,
+                             logfc.threshold = 0.5, only.pos = T)
+ENTl.IT.marker<- FindMarkers(ENT.IT.s4obj, ident.1 = "ENTl",
+                             ident.2 = "ENTm", min.diff.pct = 0.2,
+                             logfc.threshold = 0.5, only.pos = T)
+```
+
+```{r}
+ENTm.IT.marker
+```
+
+```{r}
+ENTl.IT.marker
+```
+
+```{r}
+FeaturePlot(ENT.IT.s4obj, features = "Reln")+
+  VlnPlot(ENT.IT.s4obj, features = "Reln", group.by = "subclass_label")
+FeaturePlot(ENT.IT.s4obj, features = "Calb1")+
+  VlnPlot(ENT.IT.s4obj, features = "Calb1", group.by = "subclass_label")
+FeaturePlot(ENT.IT.s4obj, features = "Satb2")+
+  VlnPlot(ENT.IT.s4obj, features = "Satb2", group.by = "subclass_label")
+FeaturePlot(ENT.IT.s4obj, features = "Tbr1")+
+  VlnPlot(ENT.IT.s4obj, features = "Tbr1", group.by = "subclass_label")
+FeaturePlot(ENT.IT.s4obj, features = "Rorb")+
+  VlnPlot(ENT.IT.s4obj, features = "Rorb", group.by = "subclass_label")
+```
+
+```{r}
+Idents(ENT.IT.s4obj)<- ENT.IT.s4obj@meta.data$subclass_label
+ENT.IT.marker<- FindAllMarkers(ENT.IT.s4obj, logfc.threshold = 0.5,
+                               min.diff.pct = 0.2, only.pos = T)
+Idents(ENT.IT.s4obj)<- ENT.IT.s4obj@meta.data$region_label
+```
+
+```{r}
+ENT.IT.marker %>%
+  group_by(cluster) %>%
+  top_n(n = 20, wt = avg_log2FC) 
+```
+
+```{r}
+writeData(workbook, "HIP", adultInfo(HIPDiff02FC07))
+writeData(workbook, "ENT", adultInfo(ENTDiff02FC05))
+writeData(workbook, "NEO", adultInfo(NEODiff02FC07))
+
+writeData(workbook, "HIPd", adultInfo(HIPDDiff02Fc06))
+writeData(workbook, "HIPv", adultInfo(HIPVDiff02Fc06))
+
+writeData(workbook, "DGd", adultInfo(HIPsubDVTop10[1:10,]))
+writeData(workbook, "DGv", adultInfo(HIPsubDVTop10[11:20,]))
+writeData(workbook, "CA1v", adultInfo(HIPsubDVTop10[21:30,]))
+writeData(workbook, "CA1d", adultInfo(HIPsubDVTop10[31:40,]))
+writeData(workbook, "CA3d", adultInfo(HIPsubDVTop10[41:50,]))
+writeData(workbook, "CA3v", adultInfo(HIPsubDVTop10[51:60,]))
+
+writeData(workbook, "ENTm", adultInfo(ENTMec))
+writeData(workbook, "ENTl", adultInfo(ENTLec))
+```
+
+```{r}
+saveWorkbook(workbook, 
+             file = "region_info.xlsx", 
+             overwrite = T)
+```
+
