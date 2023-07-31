@@ -1,11 +1,11 @@
 # Seperation of Hippocampus dorsal and ventral 
-＝＝＝＝
+
 
 #### This project has successfully achieved the separation of the dorsal and ventral parts of the subregion from the hippocampus,
 #### specifically CA1, CA3, DG, and Suniculum. 
 
-＊ Programming language 
-  * R
+## Programming language  
+ R
 
 ## Data Based
 
