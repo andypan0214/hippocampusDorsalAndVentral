@@ -19,7 +19,7 @@ Within the Ssv4 datasets, the paper included the data stored as rda data, dataty
 Based on the paper the dataset include the part of Hippocampal (HIP) where further separated into multiple clusters.
 Since our data is focusing on the hippocampus, we decided to choose the ss.rda data provided in the Ssv4 method. 
 
-## Files detail
+## Files Detail
 
 three Rmarkdown files and one Rshiny file were created: 
 
